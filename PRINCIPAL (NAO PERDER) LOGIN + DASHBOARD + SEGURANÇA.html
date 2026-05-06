@@ -349,15 +349,16 @@ window.addEventListener('load', () => {
       return
     }
 
-    const { data: userData } = await supabaseClient
-      .from('usuarios')
-      .select('*')
-      .eq('email', email)
-      .single()
+    const { data: userData, error: userError } = await supabaseClient
+  .from('usuarios')
+  .select('*')
+  .eq('email', email)
+  .single()
 
-    if (!userData || !userData.ativo) {
-      document.getElementById('status').innerText = "Acesso negado"
-      return
+if (userError) {
+  console.error(userError)
+  document.getElementById('status').innerText = "Erro ao validar acesso"
+  return
     }
 
     document.getElementById('login-overlay').style.display = 'none'
