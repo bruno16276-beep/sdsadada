@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Photons Energia Solar — Dashboard BESS v2</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+:root{
+  --bg:#f4f3ef;--surface:#fff;--surface2:#f0efe9;--border:#e0ddd5;
+  --text:#18170f;--text2:#6b6960;--text3:#a09e96;
+  --green:#3a5c1e;--green-bg:#eaf4ea;--green-bd:#b3d9b3;
+  --blue:#0f4a8a;--blue-bg:#e6f0fb;--blue-bd:#aecdef;
+  --purple:#3d2fa0;--purple-bg:#edeafb;
+  --amber:#7a4d00;--amber-bg:#fdf2e0;--amber-bd:#f0cc80;
+  --red:#8a1414;--red-bg:#fdeaea;--red-bd:#f0b8b8;
+  --warn:#7a5500;--warn-bg:#fff8e6;--warn-bd:#f0d890;
+  --r:10px;--rsm:6px;
+  --sh:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.04);
+  --shm:0 8px 28px rgba(0,0,0,.14)
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;min-height:100vh}
+.app{max-width:1120px;margin:0 auto;padding:24px 18px}
+/* TOPBAR */
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:10px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-icon{width:36px;height:36px;background:#1a2e10;border-radius:9px;display:flex;align-items:center;justify-content:center}
+.brand-icon svg{width:18px;height:18px;fill:#6ecf50}
+.brand-name{font-size:17px;font-weight:600;color:var(--green);letter-spacing:-.02em}
+.brand-sub{font-size:11px;color:var(--text2)}
+.topbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.badge{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:12px;color:var(--text2)}
+.badge b{color:var(--text)}
+/* TOAST */
+#toast{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast-item{padding:11px 18px;border-radius:9px;font-size:13px;font-weight:500;box-shadow:var(--shm);pointer-events:all;opacity:1;transition:opacity .4s;max-width:340px}
+.toast-ok{background:#1a2e10;color:#7ecf5a}
+.toast-warn{background:#fff8e6;color:var(--warn);border:1px solid var(--warn-bd)}
+.toast-err{background:var(--red-bg);color:var(--red);border:1px solid var(--red-bd)}
+/* TABS */
+.tabs-wrap{display:flex;align-items:center;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+.tabs-bar{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:4px;flex-wrap:wrap;flex:1}
+.tab{padding:7px 14px;border-radius:var(--rsm);font-size:13px;font-weight:500;cursor:pointer;color:var(--text2);border:none;background:none;transition:all .15s;white-space:nowrap;font-family:inherit}
+.tab:hover{background:var(--surface2);color:var(--text)}
+.tab.active{background:var(--text);color:#fff}
+.tabwrap{position:relative;display:inline-flex;align-items:center}
+.tabdel{display:none;position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:var(--red);color:#fff;font-size:9px;font-weight:700;border:none;cursor:pointer;align-items:center;justify-content:center;z-index:2;line-height:1}
+.tabwrap:hover .tabdel{display:flex}
+/* BUTTONS */
+.btn{padding:7px 14px;border-radius:var(--rsm);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;border:1px solid var(--border);background:var(--surface);color:var(--text2)}
+.btn:hover{background:var(--surface2)}
+.btn-prim{background:var(--text);color:#fff;border-color:var(--text)}
+.btn-prim:hover{opacity:.85}
+.btn-green{background:#1a2e10;color:#fff;border-color:#1a2e10}
+.btn-green:hover{background:var(--green)}
+.btn-red{background:var(--red-bg);color:var(--red);border-color:var(--red-bd)}
+.btn-red:hover{background:var(--red);color:#fff}
+.btn-amber{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-bd)}
+/* UPLOAD */
+.upload-zone{border:2px dashed var(--border);border-radius:var(--r);padding:20px;text-align:center;cursor:pointer;background:var(--surface);position:relative;margin-bottom:18px;transition:all .2s}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--green);background:var(--green-bg)}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-row{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}
+.upload-icon{width:34px;height:34px;background:var(--surface2);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.upload-icon svg{width:17px;height:17px;stroke:var(--text2);fill:none;stroke-width:1.5}
+.proc{display:none;align-items:center;gap:8px;padding:10px 14px;background:var(--blue-bg);border:1px solid var(--blue-bd);border-radius:var(--rsm);font-size:13px;color:var(--blue);margin-bottom:10px}
+.spin{width:15px;height:15px;border:2px solid var(--blue-bd);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* PREMISSAS */
+.prem-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;box-shadow:var(--sh);margin-bottom:18px}
+.prem-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.prem-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:11px}
+.inp-g{display:flex;flex-direction:column;gap:4px}
+.inp-g label{font-size:11px;color:var(--text2);font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+.inp-g input{padding:7px 9px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;transition:border-color .15s}
+.inp-g input:focus{outline:none;border-color:var(--green)}
+.inp-g .unit{font-size:10px;color:var(--text3);margin-top:2px}
+.divider-label{grid-column:1/-1;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);padding:6px 0 2px;border-top:1px solid var(--border);margin-top:4px}
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh);margin-bottom:16px}
+.card-hdr{padding:11px 16px;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);background:var(--surface2);display:flex;align-items:center;justify-content:space-between}
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh)}
+.kpi-lbl{font-size:11px;color:var(--text2);margin-bottom:5px;font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+.kpi-val{font-size:20px;font-weight:600;letter-spacing:-.02em;font-family:'IBM Plex Mono',monospace}
+.kpi.g{border-color:var(--green-bd);background:var(--green-bg)}.kpi.g .kpi-val{color:var(--green)}
+.kpi.b{border-color:var(--blue-bd);background:var(--blue-bg)}.kpi.b .kpi-val{color:var(--blue)}
+.kpi.p{background:var(--purple-bg)}.kpi.p .kpi-val{color:var(--purple)}
+.kpi.a{background:var(--amber-bg)}.kpi.a .kpi-val{color:var(--amber)}
+.kpi.r{background:var(--red-bg)}.kpi.r .kpi-val{color:var(--red)}
+/* TABLE */
+.dtbl{width:100%;border-collapse:collapse;font-size:13px}
+.dtbl th{padding:7px 13px;text-align:left;font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);background:var(--surface2)}
+.dtbl td{padding:8px 13px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:top}
+.dtbl tr:last-child td{border-bottom:none}
+.dtbl tr:hover td{background:var(--surface2)}
+.val{text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px}
+.pos{color:var(--green);font-weight:600}
+.neg{color:var(--red);font-weight:600}
+.tdf{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text2);background:var(--surface2);border-radius:4px;padding:2px 6px;display:inline-block}
+/* PROPOSTA */
+.proposta{background:#1a2e10;color:#fff;border-radius:var(--r);padding:22px;margin-bottom:18px}
+.prop-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.4);margin-bottom:14px}
+.prop-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px}
+.prop-item{background:rgba(255,255,255,.08);border-radius:8px;padding:13px 15px}
+.prop-lbl{font-size:11px;color:rgba(255,255,255,.5);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;font-weight:500}
+.prop-val{font-size:18px;font-weight:600;font-family:'IBM Plex Mono',monospace;color:#fff;letter-spacing:-.02em}
+.prop-sub{font-size:11px;color:rgba(255,255,255,.38);margin-top:3px}
+/* ROI */
+.roi-card{background:var(--surface);border:1px solid var(--amber-bd);border-radius:var(--r);padding:18px;box-shadow:var(--sh);margin-bottom:18px}
+.roi-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--amber);margin-bottom:14px}
+.roi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px}
+.roi-item{background:var(--amber-bg);border-radius:8px;padding:12px 14px}
+.roi-lbl{font-size:11px;color:var(--amber);margin-bottom:4px;font-weight:500;text-transform:uppercase;letter-spacing:.04em}
+.roi-val{font-size:22px;font-weight:600;color:var(--amber);font-family:'IBM Plex Mono',monospace;letter-spacing:-.02em}
+.roi-sub{font-size:11px;color:var(--text2);margin-top:3px}
+/* MEM */
+.mem-toggle{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--blue);cursor:pointer;padding:5px 0;border:none;background:none;font-family:inherit}
+.mem-box{display:none;background:var(--surface2);border:1px solid var(--border);border-radius:var(--rsm);padding:14px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.9;white-space:pre-wrap;color:var(--text);margin-top:6px;overflow-x:auto}
+.mem-box.open{display:block}
+/* ALERTS */
+.alert{border-radius:var(--rsm);padding:9px 13px;font-size:12px;margin-bottom:10px;display:flex;align-items:flex-start;gap:8px}
+.alert-warn{background:var(--warn-bg);border:1px solid var(--warn-bd);color:var(--warn)}
+.alert-err{background:var(--red-bg);border:1px solid var(--red-bd);color:var(--red)}
+.alert-ok{background:var(--green-bg);border:1px solid var(--green-bd);color:var(--green)}
+.alert-info{background:var(--blue-bg);border:1px solid var(--blue-bd);color:var(--blue)}
+/* TOTAL TAG */
+.total-tag{display:inline-flex;align-items:center;gap:10px;background:var(--green-bg);border:1px solid var(--green-bd);border-radius:var(--rsm);padding:10px 16px;margin-bottom:16px;flex-wrap:wrap}
+.ttlbl{font-size:12px;color:var(--green);font-weight:500}
+.ttval{font-size:19px;font-weight:700;color:var(--green);font-family:'IBM Plex Mono',monospace}
+/* CHART */
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;box-shadow:var(--sh);margin-bottom:16px}
+.chart-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);margin-bottom:14px}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--text2);margin-top:8px;flex-wrap:wrap}
+.legend span{display:flex;align-items:center;gap:4px}
+.dot{width:10px;height:10px;border-radius:2px;display:inline-block;flex-shrink:0}
+/* TWO COL */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:580px){.two-col{grid-template-columns:1fr}}
+/* EMPTY */
+.empty{text-align:center;padding:40px 20px;color:var(--text2)}
+.empty-icon{font-size:36px;margin-bottom:10px}
+/* MODAL */
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal-box{background:var(--surface);border-radius:14px;width:100%;max-width:760px;max-height:92vh;overflow-y:auto;box-shadow:var(--shm)}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--surface2);border-radius:14px 14px 0 0;position:sticky;top:0;z-index:2}
+.modal-hdr-title{font-size:15px;font-weight:600}
+.modal-hdr-sub{font-size:11px;color:var(--text2)}
+.modal-close{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:none;cursor:pointer;font-size:14px;color:var(--text2);display:flex;align-items:center;justify-content:center}
+.modal-close:hover{background:var(--red-bg);color:var(--red)}
+.modal-body{padding:20px}
+.modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;background:var(--surface2);border-radius:0 0 14px 14px;position:sticky;bottom:0}
+/* CONFIDENCE */
+.conf-high{color:var(--green);font-size:11px;font-weight:600}
+.conf-med{color:var(--amber);font-size:11px;font-weight:600}
+.conf-low{color:var(--red);font-size:11px;font-weight:600}
+.field-ok input{border-color:var(--green-bd)!important;background:var(--green-bg)!important}
+.field-warn input{border-color:var(--amber-bd)!important;background:var(--amber-bg)!important}
+.field-err input{border-color:var(--red-bd)!important;background:var(--red-bg)!important}
+/* FORM GRID */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg label{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;display:flex;align-items:center;justify-content:space-between}
+.fg input{padding:8px 10px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border-color .15s}
+.fg input:focus{border-color:var(--green)}
+/* CONFIDENCE BADGE */
+.cbadge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600}
+.cbadge-h{background:var(--green-bg);color:var(--green)}
+.cbadge-m{background:var(--amber-bg);color:var(--amber)}
+.cbadge-l{background:var(--red-bg);color:var(--red)}
+/* POP CONFIRM */
+.pop-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9500;display:flex;align-items:center;justify-content:center;padding:16px}
+.pop{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:24px;width:320px;box-shadow:var(--shm)}
+.pop h3{font-size:15px;font-weight:600;margin-bottom:6px}
+.pop p{font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.5}
+.pop-btns{display:flex;gap:8px;justify-content:flex-end}
+/* TEXT VIEWER */
+.text-viewer{font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.7;white-space:pre-wrap;background:var(--surface2);border:1px solid var(--border);border-radius:var(--rsm);padding:14px;max-height:400px;overflow-y:auto;color:var(--text2)}
+/* EXPORT BAR */
+.export-bar{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+@media print{.no-print{display:none!important}.app{max-width:100%;padding:10px}}
+@media(max-width:480px){.kpi-grid{grid-template-columns:1fr 1fr}.prem-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- TOPBAR -->
+  <div class="topbar no-print">
+    <div class="brand">
+      <div class="brand-icon"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm0 3l2.5 5h5l-4 3 1.5 5L12 15l-5 3 1.5-5-4-3h5z"/></svg></div>
+      <div><div class="brand-name">Photons Energia Solar</div><div class="brand-sub">Dashboard BESS v2.0</div></div>
+    </div>
+    <div class="topbar-right">
+      <div class="badge"><b id="badge-n">0</b> fatura(s)</div>
+      <span id="save-status" style="font-size:11px;color:var(--text3)"></span>
+    </div>
+  </div>
+
+  <!-- UPLOAD -->
+  <div class="upload-zone no-print" id="dropzone">
+    <input type="file" id="file-input" accept=".pdf" multiple>
+    <div class="upload-row">
+      <div class="upload-icon"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+      <div><div style="font-size:14px;font-weight:500">Arraste faturas PDF ou clique para selecionar</div><div style="font-size:11px;color:var(--text2)">Múltiplos arquivos · Neoenergia/Elektro · Extração automática com conferência</div></div>
+      <div style="padding:7px 16px;background:var(--text);color:#fff;border-radius:var(--rsm);font-size:12px;font-weight:600">Selecionar</div>
+    </div>
+  </div>
+  <div class="proc no-print" id="proc"><div class="spin"></div><span id="proc-msg">Lendo PDF...</span></div>
+
+  <!-- PREMISSAS -->
+  <div class="prem-card no-print">
+    <div class="prem-title">
+      <span>Premissas do BESS</span>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-amber" onclick="exportarJSON()" style="font-size:11px;padding:4px 10px">⬇ Exportar JSON</button>
+        <button class="btn" onclick="importarJSON()" style="font-size:11px;padding:4px 10px">⬆ Importar JSON</button>
+        <button class="btn btn-red" onclick="limparEstudo()" style="font-size:11px;padding:4px 10px">✕ Limpar</button>
+        <input type="file" id="import-json-input" accept=".json" style="display:none" onchange="importarJSONFile(event)">
+      </div>
+    </div>
+    <div class="prem-grid">
+      <div class="divider-label">Eficiência</div>
+      <div class="inp-g"><label>η_chg (%)</label><input type="number" id="eta_chg" value="95" min="1" max="100" step="1" oninput="recalcAll()"><div class="unit">Eficiência de carga</div></div>
+      <div class="inp-g"><label>η_dis (%)</label><input type="number" id="eta_dis" value="95" min="1" max="100" step="1" oninput="recalcAll()"><div class="unit">Eficiência de descarga</div></div>
+      <div class="inp-g"><label>DoD (%)</label><input type="number" id="dod" value="90" min="1" max="100" step="1" oninput="recalcAll()"></div>
+      <div class="inp-g"><label>E_aux (kWh/dia)</label><input type="number" id="eaux" value="10" min="0" step="1" oninput="recalcAll()"><div class="unit">Standby</div></div>
+      <div class="divider-label">Fator de capacidade</div>
+      <div class="inp-g"><label>Overbuild (%)</label><input type="number" id="ovb" value="80" min="1" max="100" step="1" oninput="recalcAll()"></div>
+      <div class="inp-g"><label>Augmentation (%)</label><input type="number" id="aug" value="90" min="1" max="100" step="1" oninput="recalcAll()"></div>
+      <div class="divider-label">Arbitragem</div>
+      <div class="inp-g"><label>Fração cobertura (%)</label><input type="number" id="frac" value="70" min="1" max="100" step="5" oninput="recalcAll()"><div class="unit">% da energia ponta</div></div>
+      <div class="inp-g"><label>Dias úteis/mês</label><input type="number" id="dias" value="22" min="1" max="31" step="1" oninput="recalcAll()"></div>
+      <div class="inp-g"><label>Janela ponta (h)</label><input type="number" id="hponta" value="3" min="0.5" max="8" step="0.5" oninput="recalcAll()"></div>
+      <div class="divider-label">Backup</div>
+      <div class="inp-g"><label>P_backup (kW)</label><input type="number" id="pbkp" value="0" min="0" step="10" oninput="recalcAll()"></div>
+      <div class="inp-g"><label>t_backup (h)</label><input type="number" id="tbkp" value="0.5" min="0.1" step="0.1" oninput="recalcAll()"></div>
+      <div class="divider-label">Financeiro</div>
+      <div class="inp-g"><label>CAPEX R$ (opcional)</label><input type="number" id="capex" value="" placeholder="Ex: 800000" oninput="recalcAll()"></div>
+    </div>
+  </div>
+
+  <!-- EXPORT BAR -->
+  <div class="export-bar no-print" id="export-bar" style="display:none">
+    <button class="btn" onclick="exportarCSV()">⬇ CSV</button>
+    <button class="btn" onclick="gerarRelatorioMes()">🖨 Imprimir mês</button>
+    <button class="btn btn-green" onclick="gerarRelatorioCompleto()">📄 Relatório completo PDF</button>
+    <button class="btn btn-prim" onclick="carregarDemo()">Demo</button>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs-wrap no-print" id="tabs-wrap" style="display:none">
+    <div class="tabs-bar" id="tabs-bar"></div>
+    <button class="btn btn-red" onclick="confirmarReset()" style="font-size:12px">✕ Apagar tudo</button>
+  </div>
+
+  <!-- CONTENT -->
+  <div id="content"></div>
+
+  <!-- EMPTY -->
+  <div class="empty no-print" id="empty-state">
+    <div class="empty-icon">⚡</div>
+    <h3>Dashboard BESS v2.0 pronto</h3>
+    <p style="margin-bottom:16px">Faça upload de faturas PDF ou carregue os dados de demonstração</p>
+    <button class="btn btn-green" onclick="carregarDemo()">Carregar demonstração</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- MODAL CONFERÊNCIA PDF -->
+<div id="modal-conf" class="modal-ov" style="display:none">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <div><div class="modal-hdr-title">Conferência dos dados extraídos</div><div class="modal-hdr-sub" id="conf-sub">Verifique e corrija os dados antes de confirmar</div></div>
+      <button class="modal-close" onclick="fecharConf()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="conf-alerts"></div>
+      <div id="conf-confidence" style="margin-bottom:14px;font-size:12px;color:var(--text2)"></div>
+      <div class="form-grid" id="conf-form"></div>
+      <div style="margin-top:14px">
+        <button class="btn" onclick="verTextoPDF()" style="font-size:11px">🔍 Ver texto extraído do PDF</button>
+      </div>
+      <div id="conf-text-viewer" style="display:none;margin-top:10px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="fecharConf()">Cancelar</button>
+      <button class="btn btn-green" onclick="confirmarFatura()">✓ Confirmar e adicionar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR FATURA -->
+<div id="modal-edit" class="modal-ov" style="display:none">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <div><div class="modal-hdr-title">Editar dados da fatura</div><div class="modal-hdr-sub" id="edit-sub">Altere os campos e confirme para recalcular</div></div>
+      <button class="modal-close" onclick="fecharEdit()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid" id="edit-form"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="fecharEdit()">Cancelar</button>
+      <button class="btn btn-green" onclick="salvarEdit()">✓ Salvar e recalcular</button>
+    </div>
+  </div>
+</div>
+
+<!-- POP CONFIRM -->
+<div id="pop-ov" class="pop-ov" style="display:none" onclick="if(event.target===this)fecharPop()">
+  <div class="pop">
+    <h3 id="pop-title">Confirmar</h3><p id="pop-msg"></p>
+    <div class="pop-btns">
+      <button class="btn" onclick="fecharPop()">Cancelar</button>
+      <button class="btn btn-red" id="pop-ok">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+
+
+
+
+<script>
+window.addEventListener('load', () => {
+  const supabaseClient = window.supabase.createClient(
+    'https://rxmfafapkmyvswdeaxgu.supabase.co',
+    'sb_publishable_Q0wAaL6_2GrES9DxyFLqSQ_Yy91KZnI'
+  )
+
+  window.login = async function() {
+    const email = document.getElementById('email').value
+    const senha = document.getElementById('senha').value
+
+    const { error } = await supabaseClient.auth.signInWithPassword({
+      email: email,
+      password: senha
+    })
+
+    if (error) {
+      document.getElementById('status').innerText = "Email ou senha inválidos"
+      return
+    }
+
+    const { data: userData } = await supabaseClient
+      .from('usuarios')
+      .select('*')
+      .eq('email', email)
+      .single()
+
+    if (!userData || !userData.ativo) {
+      document.getElementById('status').innerText = "Acesso negado"
+      return
+    }
+
+    document.getElementById('login-overlay').style.display = 'none'
+  }
+})
+</script>
+
+</body></html>`;
+
+  const win = window.open('','_blank');
+  if(!win){ toast('Pop-up bloqueado. Permita pop-ups e tente novamente.','err',5000); return; }
+  win.document.write(html);
+  win.document.close();
+  setTimeout(()=>win.print(), 800);
+  toast('Relatório completo gerado','ok');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   EXPORTAR CSV
+═══════════════════════════════════════════════════════════ */
+function exportarCSV(){
+  const p=getP();
+  const headers=['Mês','Consumo ponta (kWh)','Consumo fora ponta (kWh)','Tarifa ponta (R$/kWh)',
+    'Tarifa fora ponta (R$/kWh)','Delta tarifário','Demanda contratada (kW)','Demanda registrada (kW)',
+    'Ultrapassagem (kW)','Energia coberta/dia (kWh)','Recarga/dia (kWh)','Eco arbitragem (R$)',
+    'Eco peak shaving (R$)','Economia total (R$)','PCS arbitragem (kW)','PCS backup (kW)','PCS final (kW)',
+    'E_nom Overbuild (kWh)','E_nom Augmentation (kWh)','CAPEX (R$)','Payback (meses)'];
+  const rows=[headers];
+  STATE.faturas.forEach(f=>{
+    const r=calcMes(f,p);
+    if(!r){rows.push([f.mes,...Array(headers.length-1).fill('N/A')]);return;}
+    const pb=p.capex>0&&r.ecoTotal>0?(p.capex/r.ecoTotal).toFixed(1):'';
+    rows.push([
+      f.mes, f.consumoPonta, f.consumoFP, fN(f.tarifaPonta,6), fN(f.tarifaFP,6),
+      fN(r.delta,6), f.demandaContratada, f.demandaRegistrada, fN(r.excedente,2),
+      fN(r.eEnt,2), fN(r.eGridIn,2), r.ecoMes.toFixed(2), r.ecoPeak.toFixed(2),
+      r.ecoTotal.toFixed(2), fN(r.pcsArb,2), p.pbkp, fN(r.pcsFinal,0),
+      fN(r.eFinOvb,1), fN(r.eFinAug,1), p.capex||'', pb
+    ]);
+  });
+  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));
+  a.download='photons_bess_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  toast('CSV exportado','ok');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   POP / DELETE / RESET
+═══════════════════════════════════════════════════════════ */
+function mostrarPop(title,msg,okLabel,fn){
+  document.getElementById('pop-title').textContent=title;
+  document.getElementById('pop-msg').textContent=msg;
+  document.getElementById('pop-ok').textContent=okLabel;
+  document.getElementById('pop-ok').onclick=()=>{fecharPop();fn();};
+  document.getElementById('pop-ov').style.display='flex';
+}
+function fecharPop(){document.getElementById('pop-ov').style.display='none';}
+
+function confirmarDelete(id){
+  const f=STATE.faturas.find(x=>x.id===id);if(!f)return;
+  mostrarPop('Remover fatura?','Deseja remover a fatura de '+f.mes+'?','Remover',()=>{
+    const idx=STATE.faturas.findIndex(x=>x.id===id);
+    STATE.faturas.splice(idx,1);
+    if(STATE.activeTab===id) STATE.activeTab=STATE.faturas.length?STATE.faturas[Math.max(0,idx-1)].id:'';
+    if(STATE.faturas.length===1&&STATE.activeTab==='total') STATE.activeTab=STATE.faturas[0].id;
+    if(!STATE.faturas.length) document.getElementById('empty-state').style.display='block';
+    salvarEstudo(); renderUI();
+    toast('Fatura removida','ok');
+  });
+}
+
+function confirmarReset(){
+  mostrarPop('Apagar tudo?','Todas as faturas serão removidas.','Apagar tudo',()=>{
+    STATE.faturas=[]; STATE.activeTab='';
+    Object.values(STATE.charts).forEach(c=>{try{c.destroy()}catch(e){}});STATE.charts={};
+    document.getElementById('file-input').value='';
+    document.getElementById('empty-state').style.display='block';
+    salvarEstudo(); renderUI();
+    toast('Estudo limpo','ok');
+  });
+}
+
+function recalcAll(){
+  salvarEstudo();
+  renderContent();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════ */
+(function init(){
+  const saved=carregarEstudoSalvo();
+  if(saved && saved.faturas && saved.faturas.length){
+    mostrarPop(
+      'Estudo salvo encontrado',
+      'Existe um estudo com '+saved.faturas.length+' fatura(s) salvo neste navegador ('+new Date(saved.savedAt||Date.now()).toLocaleString('pt-BR')+').\nDeseja carregar?',
+      'Carregar estudo',
+      ()=>restaurarEstudo(saved)
+    );
+  }
+})();
+</script>
+
+<!-- LOGIN OVERLAY -->
+<div id="login-overlay" style="position:fixed;inset:0;background:#f3f2ef;display:flex;align-items:center;justify-content:center;z-index:9999;">
+  <div style="background:white;padding:40px;border-radius:14px;width:350px;box-shadow:0 10px 30px rgba(0,0,0,0.1);text-align:center;font-family:Arial;">
+    <div style="width:40px;height:40px;background:#0f2d13;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto 15px;color:#ffd54f;">⚡</div>
+    <h2>Bem-vindo</h2>
+    <div style="font-size:13px;color:#666;margin-bottom:25px;">Acesse o dashboard BESS</div>
+
+    <input id="email" type="email" placeholder="seu@email.com" style="width:100%;padding:12px;margin-top:10px;border:1px solid #ddd;border-radius:6px;">
+    <input id="senha" type="password" placeholder="••••••••" style="width:100%;padding:12px;margin-top:10px;border:1px solid #ddd;border-radius:6px;">
+
+    <button type="button" onclick="login()" style="width:100%;padding:12px;margin-top:20px;background:#0f2d13;color:white;border:none;border-radius:6px;">Entrar</button>
+    <p id="status" style="margin-top:15px;font-size:13px;"></p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+
+
+<script>
+window.addEventListener('load', () => {
+  const supabaseClient = window.supabase.createClient(
+    'https://rxmfafapkmyvswdeaxgu.supabase.co',
+    'sb_publishable_Q0wAaL6_2GrES9DxyFLqSQ_Yy91KZnI'
+  )
+
+  window.login = async function() {
+    const email = document.getElementById('email').value
+    const senha = document.getElementById('senha').value
+
+    const { error } = await supabaseClient.auth.signInWithPassword({
+      email: email,
+      password: senha
+    })
+
+    if (error) {
+      document.getElementById('status').innerText = "Email ou senha inválidos"
+      return
+    }
+
+    const { data: userData } = await supabaseClient
+      .from('usuarios')
+      .select('*')
+      .eq('email', email)
+      .single()
+
+    if (!userData || !userData.ativo) {
+      document.getElementById('status').innerText = "Acesso negado"
+      return
+    }
+
+    document.getElementById('login-overlay').style.display = 'none'
+  }
+})
+</script>
+
+</body>
+</html>
