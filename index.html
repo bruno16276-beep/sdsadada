@@ -388,137 +388,83 @@ function exportarCSV(){
     'E_nom Overbuild (kWh)','E_nom Augmentation (kWh)','CAPEX (R$)','Payback (meses)'];
   const rows=[headers];
   STATE.faturas.forEach(f=>{
-    const r=calcMes(f,p);
-    if(!r){rows.push([f.mes,...Array(headers.length-1).fill('N/A')]);return;}
-    const pb=p.capex>0&&r.ecoTotal>0?(p.capex/r.ecoTotal).toFixed(1):'';
-    rows.push([
-      f.mes, f.consumoPonta, f.consumoFP, fN(f.tarifaPonta,6), fN(f.tarifaFP,6),
-      fN(r.delta,6), f.demandaContratada, f.demandaRegistrada, fN(r.excedente,2),
-      fN(r.eEnt,2), fN(r.eGridIn,2), r.ecoMes.toFixed(2), r.ecoPeak.toFixed(2),
-      r.ecoTotal.toFixed(2), fN(r.pcsArb,2), p.pbkp, fN(r.pcsFinal,0),
-      fN(r.eFinOvb,1), fN(r.eFinAug,1), p.capex||'', pb
-    ]);
-  });
-  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));
-  a.download='photons_bess_'+new Date().toISOString().slice(0,10)+'.csv';
-  a.click();
-  toast('CSV exportado','ok');
-}
+    function calcMes(f,p){
 
-/* ═══════════════════════════════════════════════════════════
-   POP / DELETE / RESET
-═══════════════════════════════════════════════════════════ */
-function mostrarPop(title,msg,okLabel,fn){
-  document.getElementById('pop-title').textContent=title;
-  document.getElementById('pop-msg').textContent=msg;
-  document.getElementById('pop-ok').textContent=okLabel;
-  document.getElementById('pop-ok').onclick=()=>{fecharPop();fn();};
-  document.getElementById('pop-ov').style.display='flex';
-}
-function fecharPop(){document.getElementById('pop-ov').style.display='none';}
+  if(!f) return null;
 
-function confirmarDelete(id){
-  const f=STATE.faturas.find(x=>x.id===id);if(!f)return;
-  mostrarPop('Remover fatura?','Deseja remover a fatura de '+f.mes+'?','Remover',()=>{
-    const idx=STATE.faturas.findIndex(x=>x.id===id);
-    STATE.faturas.splice(idx,1);
-    if(STATE.activeTab===id) STATE.activeTab=STATE.faturas.length?STATE.faturas[Math.max(0,idx-1)].id:'';
-    if(STATE.faturas.length===1&&STATE.activeTab==='total') STATE.activeTab=STATE.faturas[0].id;
-    if(!STATE.faturas.length) document.getElementById('empty-state').style.display='block';
-    salvarEstudo(); renderUI();
-    toast('Fatura removida','ok');
-  });
-}
+  // =========================
+  // BASE TARIFÁRIA
+  // =========================
+  const delta = (f.tarifaPonta || 0) - (f.tarifaFP || 0);
 
-function confirmarReset(){
-  mostrarPop('Apagar tudo?','Todas as faturas serão removidas.','Apagar tudo',()=>{
-    STATE.faturas=[]; STATE.activeTab='';
-    Object.values(STATE.charts).forEach(c=>{try{c.destroy()}catch(e){}});STATE.charts={};
-    document.getElementById('file-input').value='';
-    document.getElementById('empty-state').style.display='block';
-    salvarEstudo(); renderUI();
-    toast('Estudo limpo','ok');
-  });
-}
+  // =========================
+  // ENERGIA NA PONTA (DIÁRIO)
+  // =========================
+  const ePontaDia = (f.consumoPonta || 0) / (p.dias || 22);
 
-function recalcAll(){
-  salvarEstudo();
-  renderContent();
-}
+  // cobertura (% configurável)
+  const eEnt = ePontaDia * ((p.frac || 0) / 100);
 
-/* ═══════════════════════════════════════════════════════════
-   INIT
-═══════════════════════════════════════════════════════════ */
-(function init(){
-  const saved=carregarEstudoSalvo();
-  if(saved && saved.faturas && saved.faturas.length){
-    mostrarPop(
-      'Estudo salvo encontrado',
-      'Existe um estudo com '+saved.faturas.length+' fatura(s) salvo neste navegador ('+new Date(saved.savedAt||Date.now()).toLocaleString('pt-BR')+').\nDeseja carregar?',
-      'Carregar estudo',
-      ()=>restaurarEstudo(saved)
-    );
+  // =========================
+  // EFICIÊNCIA DO SISTEMA
+  // =========================
+  const etaChg = (p.eta_chg || 100) / 100;
+  const etaDis = (p.eta_dis || 100) / 100;
+
+  // energia necessária da rede para carregar
+  const eGridIn = eEnt / (etaChg * etaDis);
+
+  // =========================
+  // ECONOMIA ARBITRAGEM
+  // =========================
+  const ecoMes = eEnt * delta * (p.dias || 22);
+
+  // =========================
+  // PEAK SHAVING (DEMANDA)
+  // =========================
+  let excedente = 0;
+  let ecoPeak = 0;
+
+  if(f.demandaRegistrada && f.demandaContratada){
+    excedente = Math.max(0, f.demandaRegistrada - f.demandaContratada);
+
+    // valor simplificado (pode ajustar depois)
+    ecoPeak = excedente * (f.tarifaDemanda || 0);
   }
-})();
-</script>
 
-<!-- LOGIN OVERLAY -->
-<div id="login-overlay" style="position:fixed;inset:0;background:#f3f2ef;display:flex;align-items:center;justify-content:center;z-index:9999;">
-  <div style="background:white;padding:40px;border-radius:14px;width:350px;box-shadow:0 10px 30px rgba(0,0,0,0.1);text-align:center;font-family:Arial;">
-    <div style="width:40px;height:40px;background:#0f2d13;border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto 15px;color:#ffd54f;">⚡</div>
-    <h2>Bem-vindo</h2>
-    <div style="font-size:13px;color:#666;margin-bottom:25px;">Acesse o dashboard BESS</div>
+  // =========================
+  // ECONOMIA TOTAL
+  // =========================
+  const ecoTotal = ecoMes + ecoPeak;
 
-    <input id="email" type="email" placeholder="seu@email.com" style="width:100%;padding:12px;margin-top:10px;border:1px solid #ddd;border-radius:6px;">
-    <input id="senha" type="password" placeholder="••••••••" style="width:100%;padding:12px;margin-top:10px;border:1px solid #ddd;border-radius:6px;">
+  // =========================
+  // DIMENSIONAMENTO PCS
+  // =========================
+  const pcsArb = eEnt / (p.hponta || 3);
+  const pcsFinal = Math.max(pcsArb, p.pbkp || 0);
 
-    <button type="button" onclick="login()" style="width:100%;padding:12px;margin-top:20px;background:#0f2d13;color:white;border:none;border-radius:6px;">Entrar</button>
-    <p id="status" style="margin-top:15px;font-size:13px;"></p>
-  </div>
-</div>
+  // =========================
+  // ENERGIA DO SISTEMA
+  // =========================
+  const eDia = eEnt + (p.eaux || 0);
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  const eFinOvb = eDia / ((p.ovb || 100)/100);
+  const eFinAug = eFinOvb / ((p.aug || 100)/100);
 
-
-
-<script>
-window.addEventListener('load', () => {
-  const supabaseClient = window.supabase.createClient(
-    'https://rxmfafapkmyvswdeaxgu.supabase.co',
-    'sb_publishable_Q0wAaL6_2GrES9DxyFLqSQ_Yy91KZnI'
-  )
-
-  window.login = async function() {
-    const email = document.getElementById('email').value
-    const senha = document.getElementById('senha').value
-
-    const { error } = await supabaseClient.auth.signInWithPassword({
-      email: email,
-      password: senha
-    })
-
-    if (error) {
-      document.getElementById('status').innerText = "Email ou senha inválidos"
-      return
-    }
-
-    const { data: userData } = await supabaseClient
-      .from('usuarios')
-      .select('*')
-      .eq('email', email)
-      .single()
-
-    if (!userData || !userData.ativo) {
-      document.getElementById('status').innerText = "Acesso negado"
-      return
-    }
-
-    document.getElementById('login-overlay').style.display = 'none'
-  }
-})
-</script>
-
-</body>
-</html>
+  // =========================
+  // RETORNO
+  // =========================
+  return {
+    delta,
+    eEnt,
+    eGridIn,
+    ecoMes,
+    ecoPeak,
+    ecoTotal,
+    excedente,
+    pcsArb,
+    pcsFinal,
+    eFinOvb,
+    eFinAug
+  };
+}
